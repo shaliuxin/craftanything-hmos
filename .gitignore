@@ -1,5 +1,8 @@
 # Rust build artifacts
 native/rust/target/
+tools/**/target/
+tools/exec-bridge/mock/*.exe
+*.pdb
 **/*.rs.bk
 
 # HarmonyOS build output

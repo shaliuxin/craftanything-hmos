@@ -18,7 +18,7 @@
 | AI 对话界面 | ✅ UI 已渲染（实际调用需外部后端 / API key） |
 | 中文渲染 | ✅ Noto Sans SC 内嵌，全字重正常（含粗体 / 标题） |
 | 文件选择器（OHOS DocumentViewPicker） | ✅ ArkTS 侧通路就绪 |
-| AI agent 实际执行（Claude Code / Ghidra 等） | ⚠️ UI 已渲染，实际执行需外部进程（鸿蒙沙箱限制） |
+| AI agent 实际执行（Claude Code / Ghidra 等） | ✅ 外部进程桥已接通（spawn 转给 PC 执行，见「AI agent 外部执行桥」） |
 | 自动更新 | 已门控关闭（鸿蒙无自更新机制） |
 
 **技术突破**：用 3 个最小 stub crate（`eframe` / `rfd` / `arboard`）替代上游对桌面窗口系统、原生文件对话框、跨进程剪贴板的依赖，使完整的 `craft-anything-ui-egui`（约 25 万行 Rust，含 40+ UI 模块、i18n、320 工具界面）在纯 `wgpu + egui` 管线上编译运行。
@@ -48,7 +48,8 @@ craftanything-hmos/
 │  ├─ src/main/cpp/             bridge.cpp（ca_* NAPI）/ CMakeLists.txt
 │  └─ build-profile.json5       abiFilters: arm64-v8a, x86_64
 ├─ native/rust/                 适配层 staticlib（lib.rs / bridge / input / render / …）
-├─ vendor/                      eframe·rfd·arboard stub crate + vendored egui 0.37 全家桶
+├─ vendor/                      eframe·rfd·arboard stub + vendored egui 0.37 + platform-ohos（进程桥）
+├─ tools/exec-bridge/           PC 端外部进程执行服务（ca-exec-bridge）
 ├─ third_party/wgpu-hal-30.0.1  GLES 修复版 wgpu-hal
 ├─ scripts/                     见下「构建」
 ├─ build-profile.json5          签名配置【占位符】，真实值见 signing/
@@ -96,7 +97,8 @@ python scripts/verify_native.py entry/build/default/outputs/default/entry-defaul
 
 | 脚本 | 用途 |
 |---|---|
-| `build_native.sh` | 交叉编译 Rust staticlib（按 `CRAFTANYTHING_NATIVE_TARGETS` 驱动） |
+| `build_native.sh` | 交叉编译 Rust staticlib（按 `CRAFTANYTHING_NATIVE_TARGETS` 驱动；自动调用 `setup_exec_bridge.sh`） |
+| `setup_exec_bridge.sh` | 把上游 workspace 的 platform 依赖重定向到 `vendor/platform-ohos`（可重复执行） |
 | `run_on_device.sh` | 本机开发循环：构建 → 打包 → 装到已连设备 → 启动 |
 | `verify_native.py` | 校验 HAP 的 ABI、确认无 web 残留 |
 | `make_craftanything_signing.sh` | 生成 `signing/` 下本地 CA 链（仅验证打包链路） |
@@ -129,10 +131,41 @@ python scripts/verify_native.py entry/build/default/outputs/default/entry-defaul
 - **versionName**：`0.6.1`（跟随上游）；**versionCode**：`601`
 - **应用名**：`Craft Anything`（上游产品名，不加后缀）
 
+## AI agent 外部执行桥
+
+鸿蒙应用沙箱没有「按路径 exec 任意程序」的公开 API（官方 `childProcessManager` 只能启动
+应用自身声明的入口），所以 agent 的实际执行代理到 PC：
+
+```
+UI → AiHub → platform::Process::spawn（OHOS 分支）
+   → TCP 127.0.0.1:17890（hdc rport 反向转发）
+   → ca-exec-bridge（PC）→ Command::new("claude" …)
+   → started / stdout / stderr / exit 回传 UI
+```
+
+使用前需在 PC 上准备：
+
+```bash
+# 1) 编译并启动执行桥（默认只监听 127.0.0.1:17890）
+cd tools/exec-bridge && cargo build --release && ./target/release/ca-exec-bridge.exe
+
+# 2) PC 的 PATH 中需有真实 agent CLI（claude / codex / …）
+#    以及上游 helper：cargo build --release -p craft-anything-cli（在 _upstream/ 下）
+
+# 3) 设备上建立反向端口转发
+hdc -t <device> rport tcp:17890 tcp:17890
+```
+
+然后在应用「设置 → AI → 代理」里选择 agent 并**关闭 ACP**（ACP 需要双向 stdin，
+当前桥只支持一次性 stdin 的普通 CLI 路径）。
+
+已验证：`started → stdout → exit` 协议本地跑通；真机 UI 能检测并添加 Claude Code（显示「已就绪」）；
+触发构建后的错误信息确实由 PC bridge 回传。完整真实 agent 对话需在准备好上述两个 PC 程序后复验。
+
 ## 已知限制
 
-- **AI agent 实际执行**：上游 `craft-anything-platform` 用 `portable-pty + nix + process-wrap` 拉子进程，
-  OHOS 应用沙箱禁止任意子进程，故 UI 可用但**运行期不可用**（需云端化或外部后端）。
+- **ACP 与终端捕获未代理**：ACP 需要可写的 `ChildStdin`（OHOS 侧无法虚拟）；`portable-pty`
+  终端捕获工具链也未接桥，相关工具不可用。
 - **自动更新**：鸿蒙无对应自更新机制，已门控关闭。
 - **首帧略慢**：CJK 字形图集首次构建稍慢，启动遮罩会多停留片刻（正常，非缺陷）。
 

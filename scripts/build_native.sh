@@ -9,6 +9,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ -f "$ROOT/scripts/dev.local.env" ]]; then source "$ROOT/scripts/dev.local.env"; fi
+# 上游 workspace 的 platform 是内部 path 依赖，[patch] 覆盖不了；构建前重定向到 OHOS fork。
+bash "$ROOT/scripts/setup_exec_bridge.sh"
 
 # 默认指向 Windows DevEco 安装；macOS/CI 可用 CRAFTANYTHING_NATIVE_SDK / DEVECO_SDK_HOME 覆盖。
 DEVECO_DEFAULT="${CRAFTANYTHING_DEVECO_HOME:-/c/Program Files/Huawei/DevEco Studio}"

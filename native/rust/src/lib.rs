@@ -443,6 +443,27 @@ fn analyze_bytes(data: &[u8], name: &str) -> AnalysisResult {
 
 #[cfg(target_env = "ohos")]
 fn worker(config: Config, rx: mpsc::Receiver<Message>) {
+    // 上游用 dirs::config_dir() 写 AI 配置；OHOS 上它落到不可写的
+    // /storage/Users/currentUser/config。Unix 分支优先读 XDG_CONFIG_HOME，
+    // 这里改指应用沙箱内可写目录，否则后端/密钥根本存不下来。
+    #[cfg(target_env = "ohos")]
+    {
+        // 沙箱 files 目录优先：OHOS 上 current_dir() 是 "/" ，不能拿它当配置根。
+        let mut candidates = vec![std::path::PathBuf::from("/data/storage/el2/base/files/config")];
+        if let Ok(cwd) = std::env::current_dir() {
+            candidates.push(cwd.join("config"));
+        }
+        for dir in candidates {
+            if std::fs::create_dir_all(&dir).is_ok() {
+                if let Some(base) = dir.parent() {
+                    // 项目工作区用 dirs::home_dir()，OHOS 上默认 HOME 同样不可写。
+                    std::env::set_var("HOME", base);
+                    std::env::set_var("XDG_CONFIG_HOME", base);
+                }
+                break;
+            }
+        }
+    }
     bridge::notify(0, "stage", "Rust worker entered", &[]);
     let ctx = egui::Context::default();
     let form = form_factor::Form::new(&config.device_type, config.width_vp);

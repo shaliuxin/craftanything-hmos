@@ -1,0 +1,11 @@
+[package]
+name = "ca-exec-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Runs Craft Anything CLI agents for the HarmonyOS app over a local TCP bridge"
+
+[workspace]
+
+[dependencies]
+serde_json = "1"
+hex = "0.4"

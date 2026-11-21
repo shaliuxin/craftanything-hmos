@@ -1,0 +1,36 @@
+[package]
+name = "craft-anything-platform"
+description = "Craft Anything platform services, with an OHOS process bridge (desktop behaviour unchanged)"
+version = "0.6.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# 独立 workspace：本 crate 位于移植项目的 vendor/ 下，不属于上游 workspace。
+[workspace]
+
+[dependencies]
+craft-anything-evidence = { path = "../../../_upstream/crates/evidence" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+log = "0.4"
+sha2 = "0.10"
+hex = "0.4"
+process-wrap = { version = "10", default-features = false, features = ["std", "process-group", "job-object", "kill-on-drop", "creation-flags"] }
+portable-pty = "0.9"
+vt100 = "0.16"
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+xcap = "0.9"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-graphics = "0.3"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", default-features = false, features = ["Win32_System_Threading"] }
+
+[dev-dependencies]
+tempfile = "3"

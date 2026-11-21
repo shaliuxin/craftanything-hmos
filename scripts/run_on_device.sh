@@ -10,6 +10,7 @@ SDK_USER="${OHOS_SDK_USER:-/c/Users/mingh/AppData/Local/Huawei/Sdk}"
 TARGET="${OHOS_TARGET:-aarch64-unknown-linux-ohos}"
 BUNDLE="${CA_BUNDLE:-cn.shaliuxin.craftanything}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+bash "$ROOT/scripts/setup_exec_bridge.sh"
 
 DEVICE="${1:-}"
 if [ -z "$DEVICE" ]; then
