@@ -1,0 +1,18 @@
+{
+  "UniformDataTypeDeclarations": [
+    {
+      "TypeId": "cn.shaliuxin.craftanything.craftanything",
+      "BelongingToTypes": [
+        "general.file"
+      ],
+      "FilenameExtensions": [
+        ".craftanything"
+      ],
+      "MIMETypes": [
+        "application/x-craftanything"
+      ],
+      "Description": "Craft Anything document",
+      "ReferenceURL": ""
+    }
+  ]
+}

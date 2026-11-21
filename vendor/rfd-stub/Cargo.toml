@@ -1,0 +1,6 @@
+[package]
+name = "rfd"
+version = "0.17.1"
+edition = "2021"
+description = "Minimal rfd stub for OHOS — file dialogs are handled by ArkTS DocumentViewPicker"
+publish = false

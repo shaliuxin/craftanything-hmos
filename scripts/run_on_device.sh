@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# 本地开发循环：编译 Rust 适配层（arm64）→ hvigor 打包 → 安装到已连接设备 → 启动。
+# 仅用于本机调试；正式构建请走 build_native.sh（双架构）+ DevEco 签名。
+set -uo pipefail
+
+DEVECO="${DEVECO_HOME:-/c/Program Files/Huawei/DevEco Studio}"
+SDKLLVM="$DEVECO/sdk/default/openharmony/native/llvm/bin"
+HDC="$DEVECO/sdk/default/openharmony/toolchains/hdc.exe"
+SDK_USER="${OHOS_SDK_USER:-/c/Users/mingh/AppData/Local/Huawei/Sdk}"
+TARGET="${OHOS_TARGET:-aarch64-unknown-linux-ohos}"
+BUNDLE="${CA_BUNDLE:-cn.shaliuxin.craftanything}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+DEVICE="${1:-}"
+if [ -z "$DEVICE" ]; then
+  DEVICE="$("$HDC" list targets 2>/dev/null | tr -d '\r' | head -1)"
+fi
+[ -n "$DEVICE" ] || { echo "no device connected"; exit 1; }
+echo "device=$DEVICE target=$TARGET bundle=$BUNDLE"
+
+# 注：0.40 起 SMLib 改为纯 Rust 的 solidcore，已 vendored 为本地 path 依赖（solidcore/crates/solidcore），
+# 全仓无 git 依赖。首次构建仍需联网从 crates.io 拉取 egui 0.37 / egui-wgpu 0.37 等 crate，故不强制离线。
+# 若依赖已缓存可手动设 CARGO_NET_OFFLINE=true。
+export DEVECO_SDK_HOME="$DEVECO/sdk"
+export NODE_HOME="$DEVECO/tools/node"
+export JAVA_HOME="$DEVECO/jbr"
+export PATH="$DEVECO/jbr/bin:$DEVECO/tools/node:$DEVECO/tools/hvigor/bin:$PATH"
+
+echo "--- [1/4] cargo build ---"
+cd "$ROOT/native/rust" || exit 1
+export CC_aarch64_unknown_linux_ohos="$SDKLLVM/clang.exe"
+export AR_aarch64_unknown_linux_ohos="$SDKLLVM/llvm-ar.exe"
+export CC_x86_64_unknown_linux_ohos="$SDKLLVM/clang.exe"
+export AR_x86_64_unknown_linux_ohos="$SDKLLVM/llvm-ar.exe"
+# 0.40 起 SMLib 内核为纯 Rust 的 solidcore（vendored path 依赖），不再需要 C++ 交叉编译，
+# 故移除原 CXX_aarch64/x86_64 与 CXXFLAGS（含 C:\ohossysroot）那一套。
+# 若今后某个 crate 又引入 C 依赖，可在此恢复 CC/AR（上方已设），按需再补 CXX。
+cargo build --release --target "$TARGET" 2>&1 | tail -8
+[ "${PIPESTATUS[0]}" -eq 0 ] || { echo "cargo build failed"; exit 1; }
+
+echo "--- [2/4] assembleHap ---"
+cd "$ROOT" || exit 1
+# 仓库里的 build-profile.json5 是占位符（不含本机签名路径 / 口令 hex）；
+# 若存在本地真实配置 signing/build-profile.local.json5（已 gitignore），打包前自动还原。
+if [ -f "$ROOT/signing/build-profile.local.json5" ]; then
+  cp -f "$ROOT/signing/build-profile.local.json5" "$ROOT/build-profile.json5"
+  echo "restored local signing config from signing/build-profile.local.json5"
+fi
+node "$DEVECO/tools/hvigor/bin/hvigorw.js" assembleHap --mode module \
+  -p product=default -p buildMode=debug --no-daemon 2>&1 | tail -8
+[ "${PIPESTATUS[0]}" -eq 0 ] || { echo "assembleHap failed"; exit 1; }
+
+echo "--- [3/4] install ---"
+cd "$ROOT/entry/build/default/outputs/default" || exit 1
+"$HDC" -t "$DEVICE" uninstall "$BUNDLE" 2>&1 | tr -d '\r' | tail -1
+"$HDC" -t "$DEVICE" install entry-default-signed.hap 2>&1 | tr -d '\r' | tail -2
+
+echo "--- [4/4] launch ---"
+"$HDC" -t "$DEVICE" shell hilog -r 2>&1 | tr -d '\r' | tail -1
+"$HDC" -t "$DEVICE" shell aa start -b "$BUNDLE" -a EntryAbility 2>&1 | tr -d '\r' | tail -2
+echo "done."

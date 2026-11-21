@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "app_name", "value": "Craft Anything" },
+    { "name": "module_description", "value": "Craft Anything · 剖析任意软件的工作原理并构建你自己的版本" }
+  ]
+}

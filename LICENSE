@@ -1,0 +1,20 @@
+# License
+
+Craft Anything（`cn.shaliuxin.craftanything`）是
+[storytold/craft-anything](https://github.com/storytold/craft-anything) 的 HarmonyOS 移植。
+
+## 许可
+
+本仓库**双许可**，与上游一致，取其一即可：
+
+- **MIT License** —— 见 [`LICENSE-MIT`](./LICENSE-MIT)
+- **Apache License 2.0** —— 见 [`LICENSE-APACHE-2.0`](./LICENSE-APACHE-2.0)
+
+## 说明
+
+- 上游 crate（`craft-anything-ui-egui`、`craft-anything-engine` 等）经 `path` 依赖复用，
+  其自身版权（the ArtCraft Team and the Craft Anything contributors）与许可不变；本移植**不改动上游文件**
+  （仅做 OHOS 平台 `cfg` 门控以避开 keyring/zbus/nix）。
+- 本仓库原创部分（`native/rust` 适配层、`entry` C++ 桥 / ArkTS、`scripts/`、`移植报告.md`）
+  一并采用上述 `MIT OR Apache-2.0`。
+- `LICENSE-MIT` 的版权主体暂记为 `Craft Anything contributors`，可替换为实际主体。

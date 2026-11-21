@@ -1,0 +1,20 @@
+[package]
+name = "eframe"
+version = "0.37.0"
+edition = "2021"
+description = "Minimal eframe compatibility stub for OHOS (provides types only, no windowing)"
+publish = false
+
+[dependencies]
+egui = { version = "0.37", path = "../egui/crates/egui" }
+
+[features]
+default = []
+default_fonts = []
+wgpu = []
+accesskit = []
+links = []
+x11 = []
+wayland = []
+persistence = []
+glow = []
